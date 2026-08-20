@@ -2,7 +2,7 @@ import { useEffect, useState, type FormEvent } from 'react'
 import { Link, Navigate, useNavigate } from 'react-router-dom'
 import { api } from '../api'
 import { useAuth } from '../auth'
-import { isHr, type User } from '../types'
+import { isHr, personStageLabel, type User } from '../types'
 
 export function PeoplePage() {
   const { role, user } = useAuth()
@@ -90,8 +90,7 @@ export function PeoplePage() {
             <Link to={`/app/people/${person.id}`} className="min-w-0 flex-1">
               <p className="font-medium">{person.name}</p>
               <p className="text-sm text-muted">
-                {person.code} · {person.role} ·{' '}
-                {person.hrStep < 7 ? `joining ${person.hrStep}/7` : person.hrStep < 11 ? 'active' : person.hrStep === 12 ? 'confirmed' : `step ${person.hrStep}`}
+                {person.code} · {person.role} · {personStageLabel(person)}
                 {person.hasFace ? ' · face' : ''}
               </p>
             </Link>
@@ -105,7 +104,9 @@ export function PeoplePage() {
                 </Link>
               </div>
             ) : null}
-            <span className="shrink-0 text-xs capitalize text-muted">{person.status}</span>
+            <span className="shrink-0 text-xs capitalize text-muted">
+              {person.status === 'exited' ? 'inactive' : person.status}
+            </span>
           </li>
         ))}
       </ul>

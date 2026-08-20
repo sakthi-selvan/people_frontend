@@ -5,7 +5,7 @@ import { useAuth } from '../auth'
 import { AttendanceCalendar, CalendarLegend, CalendarToolbar, statusChip, type DayInfo } from '../components/AttendanceCalendar'
 import { JoiningStage } from '../components/JoiningStage'
 import { money } from '../payCycle'
-import { isHr, type HrStep, type User } from '../types'
+import { canResign, isHr, type HrStep, type User } from '../types'
 
 type Punch = { date: string; checkIn?: string; checkOut?: string; sessions?: Array<{ checkIn?: string; checkOut?: string | null }> }
 type Holiday = { date: string; name: string }
@@ -227,7 +227,23 @@ function EmployeeHome() {
       <Link to="/app/attendance" className="inline-block text-sm text-accent">
         Open full calendar
       </Link>
-      {(me.hrStep || 0) === 12 ? (
+      {(me.hrStep || 0) >= 13 && me.status !== 'exited' ? (
+        <Link to={`/app/people/${me.id}`} className="block rounded-3xl border border-accent bg-surface px-4 py-5">
+          <p className="text-xs uppercase tracking-wide text-muted">Leaving</p>
+          <p className="mt-1 font-display text-2xl">Resignation submitted</p>
+          <p className="mt-1 text-sm text-muted">HR is reviewing your exit. Open to see the current stage.</p>
+        </Link>
+      ) : null}
+      {me.documentRequest?.open ? (
+        <Link to={`/app/people/${me.id}`} className="block rounded-3xl border border-accent bg-surface px-4 py-5">
+          <p className="text-xs uppercase tracking-wide text-muted">Documents</p>
+          <p className="mt-1 font-display text-2xl">HR asked for new documents</p>
+          <p className="mt-1 text-sm text-muted">
+            {me.documentRequest.note || 'Add the new files. Your previous documents stay on file.'}
+          </p>
+        </Link>
+      ) : null}
+      {canResign(me) ? (
         <Link to={`/app/people/${me.id}`} className="block rounded-3xl border border-line bg-surface px-4 py-5">
           <p className="text-xs uppercase tracking-wide text-muted">Leaving</p>
           <p className="mt-1 font-display text-2xl">Request resignation</p>

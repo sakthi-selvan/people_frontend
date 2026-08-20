@@ -5,7 +5,7 @@ import { useAuth } from '../auth'
 import { useTheme } from '../theme'
 import { EmailStatus } from '../components/EmailStatus'
 import { AccountPanel } from './Profile'
-import { isHr, THEMES } from '../types'
+import { canResign, isHr, THEMES } from '../types'
 
 type Template = { subject: string; body: string }
 type TemplateKey = { key: string; label: string; step: number }
@@ -85,7 +85,7 @@ export function SettingsPage() {
 
       <AccountPanel />
 
-      {!isHr(role) && (user?.hrStep || 0) === 12 ? (
+      {!isHr(role) && canResign(user) ? (
         <Link
           to={`/app/people/${user?.id}`}
           className="block rounded-3xl border border-line bg-surface px-4 py-5"
