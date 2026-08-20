@@ -78,6 +78,7 @@ export function PersonDetailPage() {
   const [docRequestNote, setDocRequestNote] = useState('')
   const [resetPassword, setResetPassword] = useState('')
   const [resetMsg, setResetMsg] = useState('')
+  const [cancelNote, setCancelNote] = useState('')
 
   async function load() {
     if (!id) return
@@ -216,6 +217,38 @@ export function PersonDetailPage() {
     }
   }
 
+  async function cancelResignation() {
+    if (!id) return
+    setError('')
+    try {
+      const result = await api<{ journey: Journey }>(`/users/${id}/resignation/cancel`, {
+        method: 'POST',
+        body: { note: cancelNote },
+      })
+      setCancelNote('')
+      setOpenStep(null)
+      setJourney(result.journey)
+      await refresh()
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Could not cancel resignation')
+    }
+  }
+
+  async function deactivateBeforeAppointment() {
+    if (!id) return
+    setError('')
+    const ok = window.confirm('Deactivate this employee? Login and employee actions will stop. This is only allowed before appointment.')
+    if (!ok) return
+    try {
+      const result = await api<{ ok: boolean; journey: Journey }>(`/users/${id}/delete`, { method: 'POST', body: {} })
+      setOpenStep(null)
+      setJourney(result.journey)
+      await refresh()
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Could not deactivate employee')
+    }
+  }
+
   const actorCanRun = selectedMeta ? canAct(role, selectedMeta.actor) : false
   const canSkip = hr
   const canSubmitResignation = waitingResignation && !hr && selected === 13
@@ -294,6 +327,20 @@ export function PersonDetailPage() {
               <pre className="mt-2 whitespace-pre-wrap font-display text-[15px] leading-7">{letter.body}</pre>
             </article>
           ))}
+
+          {hr && !isInactive(person) && person.hrStep >= 13 ? (
+            <div className="mt-4 space-y-2">
+              <textarea
+                className="w-full rounded-2xl border border-line px-4 py-3"
+                placeholder="Optional note: why HR is returning them to appointment stage"
+                value={cancelNote}
+                onChange={(e) => setCancelNote(e.target.value)}
+              />
+              <button type="button" onClick={() => void cancelResignation()} className="w-full rounded-2xl bg-accent py-3 text-accent-fg">
+                Cancel resignation and return to appointment stage
+              </button>
+            </div>
+          ) : null}
         </section>
       ) : null}
 
@@ -330,6 +377,20 @@ export function PersonDetailPage() {
           </button>
           {resetMsg ? <p className="text-sm text-good sm:w-full">{resetMsg}</p> : null}
         </form>
+      ) : null}
+
+      {hr && !isInactive(person) && (person.hrStep || 0) < 6 ? (
+        <section className="rounded-3xl border border-danger bg-surface px-4 py-4">
+          <p className="text-xs uppercase tracking-wide text-muted">Deactivate employee (before appointment)</p>
+          <p className="mt-1 text-sm text-danger">Stops login immediately. Employee actions like attendance, leave, and workflow steps will not work.</p>
+          <button
+            type="button"
+            className="mt-3 w-full rounded-2xl border border-danger bg-danger/10 py-3 text-danger"
+            onClick={() => void deactivateBeforeAppointment()}
+          >
+            Deactivate user
+          </button>
+        </section>
       ) : null}
 
       <div className="rounded-3xl border border-accent bg-surface px-4 py-4">
