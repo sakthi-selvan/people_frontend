@@ -41,10 +41,14 @@ export function KioskPage() {
 
   async function enroll(descriptor: number[], photo: string) {
     setError('')
+    if (!name.trim() || !email.trim() || !password) {
+      setError('Name, work email and password must match the People record.')
+      return
+    }
     try {
       const data = await api<PunchResult>('/kiosk/enroll', {
         method: 'POST',
-        body: { name, email, password, descriptor, photo },
+        body: { name: name.trim(), email: email.trim(), password, descriptor, photo },
       })
       setResult(data)
       setMessage(`${data.user.name} enrolled. You can check in now.`)
@@ -116,7 +120,7 @@ export function KioskPage() {
             className="rounded-3xl bg-surface px-5 py-8 text-left shadow-[inset_0_0_0_1px_var(--line)]"
           >
             <p className="font-display text-2xl">New user</p>
-            <p className="mt-1 text-sm text-muted">Enrol a face and create the employee record.</p>
+            <p className="mt-1 text-sm text-muted">Enrol a face for someone already in People, after the appointment letter.</p>
           </button>
           <button
             type="button"
@@ -138,21 +142,28 @@ export function KioskPage() {
           <button type="button" className="text-sm text-accent" onClick={() => setMode('choose')}>
             Back
           </button>
+          <p className="text-sm text-muted">
+            Name, work email and password must match the People record exactly. Enrolment is allowed only after the
+            appointment letter.
+          </p>
           <input
             placeholder="Full name"
+            autoComplete="name"
             className="w-full rounded-2xl border border-line bg-surface px-4 py-3"
             value={name}
             onChange={(e) => setName(e.target.value)}
           />
           <input
             placeholder="Work email"
+            autoComplete="username"
             className="w-full rounded-2xl border border-line bg-surface px-4 py-3"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
           />
           <input
-            placeholder="Optional login password"
+            placeholder="Login password"
             type="password"
+            autoComplete="current-password"
             className="w-full rounded-2xl border border-line bg-surface px-4 py-3"
             value={password}
             onChange={(e) => setPassword(e.target.value)}

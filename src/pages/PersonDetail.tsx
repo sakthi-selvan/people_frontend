@@ -64,7 +64,7 @@ export function PersonDetailPage() {
     setJourney(data)
     setOpenStep((current) => {
       if (current) return current
-      if (data.facePending && data.user.hrStep >= 7) return 'face'
+      if (data.facePending && data.user.hrStep >= 6) return 'face'
       if (!isHr(role) && data.nextStep && data.nextStep > 7) return 7
       return data.nextStep
     })
@@ -249,7 +249,7 @@ export function PersonDetailPage() {
         <p className="mt-1 font-display text-2xl">{nextLabel}</p>
         <p className="mt-1 text-sm text-muted">
           {journey.facePending
-            ? 'Onboarding is done. Capture a face to enable attendance.'
+            ? 'Appointment letter is done. Enrol a face at the kiosk or here to enable attendance.'
             : !hr && !nextStep
               ? 'Joining is complete. Attendance shows your days and hours.'
               : 'Complete this step to unlock the following one.'}
