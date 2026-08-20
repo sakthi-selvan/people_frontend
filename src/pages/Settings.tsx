@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, Link } from 'react-router-dom'
 import { api } from '../api'
 import { useAuth } from '../auth'
 import { useTheme } from '../theme'
@@ -84,6 +84,17 @@ export function SettingsPage() {
       </div>
 
       <AccountPanel />
+
+      {!isHr(role) && (user?.hrStep || 0) === 12 ? (
+        <Link
+          to={`/app/people/${user?.id}`}
+          className="block rounded-3xl border border-line bg-surface px-4 py-5"
+        >
+          <p className="text-xs uppercase tracking-wide text-muted">Leaving</p>
+          <p className="mt-1 font-display text-2xl">Request resignation</p>
+          <p className="mt-1 text-sm text-muted">Submit a request if you are leaving. HR cannot start this for you.</p>
+        </Link>
+      ) : null}
 
       <section>
         <h2 className="font-display text-2xl">{isHr(role) ? 'Theme' : 'Appearance'}</h2>

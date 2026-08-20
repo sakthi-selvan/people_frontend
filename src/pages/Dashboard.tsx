@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom'
 import { api } from '../api'
 import { useAuth } from '../auth'
 import { AttendanceCalendar, CalendarLegend, CalendarToolbar, statusChip, type DayInfo } from '../components/AttendanceCalendar'
+import { JoiningStage } from '../components/JoiningStage'
 import { money } from '../payCycle'
 import { isHr, type HrStep, type User } from '../types'
 
@@ -79,6 +80,11 @@ function HrHome({ userName }: { userName: string }) {
         <Stat label="Faces enrolled" value={String(faced)} />
         <Stat label="In process" value={String(people.filter((p) => p.hrStep < 7).length)} />
       </div>
+      <Link to="/app/approvals" className="block rounded-3xl border border-accent bg-surface px-4 py-5">
+        <p className="text-xs uppercase tracking-wide text-muted">Pending</p>
+        <p className="mt-1 font-display text-2xl">Approvals</p>
+        <p className="mt-1 text-sm text-muted">Review documents, joining, and other stages waiting on HR.</p>
+      </Link>
       {pay ? (
         <section className="space-y-3">
           <div className="flex items-end justify-between">
@@ -147,22 +153,7 @@ function EmployeeHome() {
 
   if (!me) return <p className="text-muted">Loading…</p>
 
-  if (joining) {
-    return (
-      <div className="space-y-6">
-        <div>
-          <p className="text-sm text-muted">Joining</p>
-          <h1 className="font-display text-3xl">{me.name}</h1>
-          <p className="text-muted">Complete these steps with HR. Attendance opens after joining.</p>
-        </div>
-        <Link to={`/app/people/${me.id}`} className="block rounded-3xl border border-accent bg-surface px-4 py-5">
-          <p className="text-xs uppercase tracking-wide text-muted">Your next step</p>
-          <p className="mt-1 font-display text-2xl">Continue joining</p>
-          <p className="mt-1 text-sm text-muted">Offer, documents, and face enrolment.</p>
-        </Link>
-      </div>
-    )
-  }
+  if (joining) return <JoiningStage userId={me.id} />
 
   const last = new Date(year, month, 0).getDate()
   const today = now.toISOString().slice(0, 10)
@@ -235,6 +226,13 @@ function EmployeeHome() {
       <Link to="/app/attendance" className="inline-block text-sm text-accent">
         Open full calendar
       </Link>
+      {(me.hrStep || 0) === 12 ? (
+        <Link to={`/app/people/${me.id}`} className="block rounded-3xl border border-line bg-surface px-4 py-5">
+          <p className="text-xs uppercase tracking-wide text-muted">Leaving</p>
+          <p className="mt-1 font-display text-2xl">Request resignation</p>
+          <p className="mt-1 text-sm text-muted">Only you can start this. HR reviews after you submit.</p>
+        </Link>
+      ) : null}
     </div>
   )
 }

@@ -2,6 +2,7 @@ import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom'
 import {
   Banknote,
   CalendarCheck,
+  ClipboardCheck,
   LayoutDashboard,
   ListChecks,
   LogOut,
@@ -25,6 +26,7 @@ export function Shell() {
     ...(isHr(role)
       ? [
           { to: '/app/people', label: 'People', icon: Users },
+          { to: '/app/approvals', label: 'Approvals', icon: ClipboardCheck },
           { to: '/app/attendance', label: 'Attendance', icon: CalendarCheck },
           { to: '/app/faces', label: 'Faces', icon: ScanFace },
           { to: '/app/leave', label: 'Leave', icon: Palmtree },
@@ -41,7 +43,7 @@ export function Shell() {
     { to: '/app/settings', label: 'Settings', icon: Settings },
   ]
   const mobile = isHr(role)
-    ? ['/app', '/app/people', '/app/attendance', '/app/payroll', '/app/leave', '/app/settings']
+    ? ['/app', '/app/approvals', '/app/people', '/app/attendance', '/app/payroll', '/app/settings']
     : joining && user
       ? ['/app', `/app/people/${user.id}`, '/app/settings']
       : ['/app', '/app/attendance', '/app/payroll', '/app/leave', '/app/settings']

@@ -3,6 +3,7 @@ import type { ReactNode } from 'react'
 import { useAuth } from './auth'
 import { Shell } from './components/Shell'
 import { AttendancePage } from './pages/Attendance'
+import { ApprovalsPage } from './pages/Approvals'
 import { DashboardPage } from './pages/Dashboard'
 import { DeviceLoginPage } from './pages/DeviceLogin'
 import { DevicesPage } from './pages/Devices'
@@ -60,6 +61,14 @@ export default function App() {
         <Route index element={<DashboardPage />} />
         <Route path="people" element={<PeoplePage />} />
         <Route path="people/:id" element={<PersonDetailPage />} />
+        <Route
+          path="approvals"
+          element={
+            <Guard allow={['hr']}>
+              <ApprovalsPage />
+            </Guard>
+          }
+        />
         <Route path="attendance" element={<AttendancePage />} />
         <Route
           path="faces"

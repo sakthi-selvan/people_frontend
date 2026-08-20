@@ -4,6 +4,7 @@ import { api } from '../api'
 import { useAuth } from '../auth'
 import { EmailStatus } from '../components/EmailStatus'
 import { FaceCapture } from '../components/FaceCapture'
+import { JoiningStage } from '../components/JoiningStage'
 import { isHr, type HrStep, type User } from '../types'
 
 type Letter = {
@@ -27,6 +28,23 @@ type Journey = {
   emails: EmailRow[]
   nextStep: number | null
   facePending: boolean
+  canRequestResignation?: boolean
+  waitingOn?: 'hr' | 'employee' | null
+}
+
+const HR_ACTION: Record<number, string> = {
+  1: 'Send offer letter',
+  4: 'Approve documents',
+  5: 'Approve joining',
+  6: 'Send appointment letter',
+  7: 'Complete onboarding',
+  8: 'Mark salary processed',
+  11: 'Complete probation review',
+  12: 'Send confirmation letter',
+  14: 'Approve resignation',
+  16: 'Complete exit clearance',
+  17: 'Complete full and final',
+  18: 'Send relieving letter',
 }
 
 const LETTER_KEY: Record<number, string> = {
@@ -65,6 +83,7 @@ export function PersonDetailPage() {
     setOpenStep((current) => {
       if (current) return current
       if (data.facePending && data.user.hrStep >= 6) return 'face'
+      if (data.canRequestResignation && !isHr(role)) return 13
       if (!isHr(role) && data.nextStep && data.nextStep > 7) return 7
       return data.nextStep
     })
@@ -75,8 +94,11 @@ export function PersonDetailPage() {
   }, [id])
 
   const person = journey?.user
-  const steps = (journey?.steps || []).filter((s) => hr || s.id <= 7)
-  const nextStep = !hr && journey?.nextStep && journey.nextStep > 7 ? null : (journey?.nextStep ?? null)
+  const waitingResignation = Boolean(journey?.canRequestResignation)
+  const steps = (journey?.steps || []).filter(
+    (s) => hr || s.id <= 7 || (waitingResignation && s.id >= 13) || ((person?.hrStep || 0) >= 13 && s.id >= 13),
+  )
+  const nextStep = !hr && journey?.nextStep && journey.nextStep > 7 && journey.nextStep < 13 ? null : (journey?.nextStep ?? null)
   const selected = openStep ?? nextStep
   const selectedMeta = typeof selected === 'number' ? steps.find((s) => s.id === selected) : null
   const selectedLetter =
@@ -169,15 +191,19 @@ export function PersonDetailPage() {
 
   const actorCanRun = selectedMeta ? canAct(role, selectedMeta.actor) : false
   const canSkip = hr
+  const canSubmitResignation = waitingResignation && !hr && selected === 13
+  const showStepActions = isNext || canSubmitResignation
 
   const nextLabel = useMemo(() => {
     if (!journey) return ''
     if (journey.facePending) return 'Enrol face'
-    if (!nextStep) return hr ? 'Lifecycle complete' : 'Joining complete'
+    if (waitingResignation) return hr ? 'Waiting for resignation request' : 'Request resignation'
+    if (!nextStep) return hr ? (person?.hrStep === 12 ? 'No exit in progress' : 'Lifecycle complete') : 'Joining complete'
     return steps.find((s) => s.id === nextStep)?.label || ''
-  }, [journey, steps, nextStep, hr])
+  }, [journey, steps, nextStep, hr, waitingResignation, person?.hrStep])
 
   if (!person || !journey) return <p className="text-muted">Loading…</p>
+  if (!hr) return <JoiningStage userId={person.id} />
 
   return (
     <div className="space-y-6 lg:flex lg:min-h-0 lg:flex-col">
@@ -245,14 +271,12 @@ export function PersonDetailPage() {
       ) : null}
 
       <div className="rounded-3xl border border-accent bg-surface px-4 py-4">
-        <p className="text-xs uppercase tracking-wide text-muted">Next action</p>
+        <p className="text-xs uppercase tracking-wide text-muted">Review</p>
         <p className="mt-1 font-display text-2xl">{nextLabel}</p>
         <p className="mt-1 text-sm text-muted">
-          {journey.facePending
-            ? 'Appointment letter is done. Enrol a face at the kiosk or here to enable attendance.'
-            : !hr && !nextStep
-              ? 'Joining is complete. Attendance shows your days and hours.'
-              : 'Complete this step to unlock the following one.'}
+          {journey.waitingOn === 'employee'
+            ? 'Waiting for this person to finish their stage.'
+            : 'Review the current stage, then approve to move them to the next one.'}
         </p>
         {!hr && person.hrStep >= 7 && !journey.facePending ? (
           <Link to="/app/attendance" className="mt-3 inline-block text-sm text-accent">
@@ -266,6 +290,7 @@ export function PersonDetailPage() {
         {steps.map((step) => {
           const done = person.hrStep >= step.id
           const current = nextStep === step.id
+          const waiting = waitingResignation && step.id === 13
           const skipped = journey.events.some((e) => e.step === step.id && e.action === 'skip')
           return (
             <li key={step.id}>
@@ -277,7 +302,7 @@ export function PersonDetailPage() {
                 }`}
               >
                 <p className="text-xs text-muted">
-                  {step.id} · {done ? (skipped ? 'Skipped' : 'Done') : current ? 'Next' : 'Locked'}
+                  {step.id} · {done ? (skipped ? 'Skipped' : 'Done') : waiting ? 'Not requested' : current ? 'Next' : 'Locked'}
                 </p>
                 <p className={done && selected !== step.id ? 'text-muted' : ''}>{step.label}</p>
               </button>
@@ -317,12 +342,23 @@ export function PersonDetailPage() {
           <>
             <div>
               <p className="text-xs text-muted">
-                {isDone ? 'Issued' : isNext ? 'In progress' : 'Locked'}
+                {isDone
+                  ? 'Issued'
+                  : waitingResignation && selected === 13
+                    ? hr
+                      ? 'Waiting for employee'
+                      : 'Not requested'
+                    : isNext
+                      ? 'In progress'
+                      : 'Locked'}
               </p>
               <h2 className="font-display text-2xl">{selectedMeta.label}</h2>
             </div>
 
             {isLocked ? <p className="text-sm text-muted">Finish the previous step to open this one.</p> : null}
+            {waitingResignation && selected === 13 && hr ? (
+              <p className="text-sm text-muted">The employee must submit this request. It is not in progress until they do.</p>
+            ) : null}
 
             {preview ? (
               <article className="rounded-2xl border border-line bg-bg p-5">
@@ -381,11 +417,11 @@ export function PersonDetailPage() {
               <p className="text-sm text-warn">This step was skipped. The next action is shown above.</p>
             ) : null}
 
-            {isNext ? (
+            {showStepActions ? (
               <div className="space-y-3">
                 <textarea
                   className="w-full rounded-2xl border border-line px-4 py-3"
-                  placeholder="Note for this step"
+                  placeholder={canSubmitResignation ? 'Reason for leaving (optional)' : 'Note for this step'}
                   value={note}
                   onChange={(e) => setNote(e.target.value)}
                 />
@@ -394,14 +430,24 @@ export function PersonDetailPage() {
                   <p className="text-sm text-muted">Review the letter above, then send it to this person only.</p>
                 ) : null}
                 <div className="flex flex-col gap-2 sm:flex-row">
-                  {actorCanRun ? (
+                  {actorCanRun || canSubmitResignation ? (
                     <button type="button" onClick={() => void runStep(false)} className="flex-1 rounded-2xl bg-accent py-3 text-accent-fg">
-                      {letterKey ? `Send ${selectedMeta.label.toLowerCase()}` : 'Complete this step'}
+                      {canSubmitResignation
+                        ? 'Submit resignation request'
+                        : selectedMeta && HR_ACTION[selectedMeta.id]
+                          ? HR_ACTION[selectedMeta.id]
+                          : letterKey
+                            ? `Send ${selectedMeta.label.toLowerCase()}`
+                            : 'Approve and continue'}
                     </button>
                   ) : (
-                    <p className="flex-1 text-sm text-muted">Waiting on {selectedMeta.actor.replaceAll('_', ' / ')}.</p>
+                    <p className="flex-1 text-sm text-muted">
+                      {waitingResignation && selected === 13
+                        ? 'Waiting for the employee to submit a resignation request.'
+                        : `Waiting on ${selectedMeta.actor.replaceAll('_', ' / ')}.`}
+                    </p>
                   )}
-                  {canSkip ? (
+                  {canSkip && isNext ? (
                     <button type="button" onClick={() => void runStep(true)} className="rounded-2xl border border-line px-4 py-3">
                       Skip
                     </button>

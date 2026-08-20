@@ -73,12 +73,16 @@ function demoPhoto(label: string) {
 
 export function FaceCapture({
   onCapture,
+  onError,
   label = 'Capture face',
   scanKey = '',
+  compact = false,
 }: {
   onCapture: (descriptor: number[], photo: string) => void
+  onError?: (message: string) => void
   label?: string
   scanKey?: string
+  compact?: boolean
 }) {
   const videoRef = useRef<HTMLVideoElement>(null)
   const [error, setError] = useState('')
@@ -86,6 +90,11 @@ export function FaceCapture({
   const [busy, setBusy] = useState(false)
   const [demo, setDemo] = useState(!cameraAvailable())
   const [identity, setIdentity] = useState('')
+
+  function fail(message: string) {
+    setError(message)
+    onError?.(message)
+  }
 
   useEffect(() => {
     if (demo) {
@@ -128,7 +137,7 @@ export function FaceCapture({
       if (demo) {
         const key = (scanKey || identity).trim()
         if (!key) {
-          setError('Enter work email to scan on HTTP.')
+          fail('Enter work email to scan on HTTP.')
           return
         }
         await new Promise((resolve) => setTimeout(resolve, 1200))
@@ -143,7 +152,7 @@ export function FaceCapture({
         .withFaceLandmarks()
         .withFaceDescriptor()
       if (!result) {
-        setError('No face found. Face the camera and try again.')
+        fail('No face found. Face the camera and try again.')
         return
       }
       const canvas = document.createElement('canvas')
@@ -154,40 +163,39 @@ export function FaceCapture({
       canvas.getContext('2d')?.drawImage(video, 0, 0, width, height)
       onCapture(Array.from(result.descriptor), canvas.toDataURL('image/jpeg', 0.72))
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Capture failed')
+      fail(err instanceof Error ? err.message : 'Capture failed')
     } finally {
       setBusy(false)
     }
   }
 
   return (
-    <div className="space-y-3">
-      <div className="overflow-hidden rounded-3xl border border-line bg-ink/10 aspect-[4/5] sm:aspect-video">
+    <div className={compact ? 'space-y-2' : 'space-y-3'}>
+      <div
+        className={`relative overflow-hidden rounded-3xl border border-line bg-ink/10 ${
+          compact ? 'aspect-video max-h-44' : 'aspect-[4/5] sm:aspect-video'
+        }`}
+      >
         {demo ? (
-          <iframe
-            src={LOTTIE_EMBED}
-            title="Face scan"
-            className="h-full w-full border-0"
-            allow="autoplay"
-          />
+          <iframe src={LOTTIE_EMBED} title="Face scan" className="h-full w-full border-0" allow="autoplay" />
         ) : (
           <video ref={videoRef} playsInline muted className="h-full w-full object-cover" />
         )}
       </div>
-      {demo ? (
+      {demo && !compact ? (
         <p className="text-sm text-muted">Camera needs HTTPS. Using a face-scan animation for this MVP.</p>
       ) : null}
       {demo && !scanKey ? (
         <input
           placeholder="Work email"
           autoComplete="username"
-          className="w-full rounded-2xl border border-line bg-surface px-4 py-3"
+          className={`w-full rounded-2xl border border-line bg-surface px-4 ${compact ? 'py-2.5' : 'py-3'}`}
           value={identity}
           onChange={(e) => setIdentity(e.target.value)}
         />
       ) : null}
       {loading ? <p className="text-sm text-muted">{demo ? 'Loading scan…' : 'Starting camera…'}</p> : null}
-      {error ? <p className="text-sm text-danger">{error}</p> : null}
+      {!onError && error ? <p className="text-sm text-danger">{error}</p> : null}
       <button
         type="button"
         onClick={() => void capture()}
