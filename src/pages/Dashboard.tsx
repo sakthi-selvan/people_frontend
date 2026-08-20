@@ -108,8 +108,9 @@ function HrHome({ userName }: { userName: string }) {
             Open people
           </Link>
         </div>
+        <div className="mt-1 text-sm text-muted">Joining, confirmation, and exit. Salary and payslips are in Payroll from attendance.</div>
         <div className="mt-4 grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
-          {steps.map((step) => (
+          {steps.filter((step) => step.id < 8 || step.id > 10).map((step) => (
             <div key={step.id} className="rounded-2xl border border-line bg-surface px-4 py-3">
               <p className="text-xs text-muted">{step.id}</p>
               <p className="text-sm">{step.label}</p>

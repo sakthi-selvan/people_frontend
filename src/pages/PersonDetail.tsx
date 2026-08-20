@@ -29,6 +29,7 @@ type Journey = {
   nextStep: number | null
   facePending: boolean
   canRequestResignation?: boolean
+  canStartProbation?: boolean
   waitingOn?: 'hr' | 'employee' | null
 }
 
@@ -38,7 +39,6 @@ const HR_ACTION: Record<number, string> = {
   5: 'Approve joining',
   6: 'Send appointment letter',
   7: 'Complete onboarding',
-  8: 'Mark salary processed',
   11: 'Complete probation review',
   12: 'Send confirmation letter',
   14: 'Approve resignation',
@@ -95,9 +95,7 @@ export function PersonDetailPage() {
 
   const person = journey?.user
   const waitingResignation = Boolean(journey?.canRequestResignation)
-  const steps = (journey?.steps || []).filter(
-    (s) => hr || s.id <= 7 || (waitingResignation && s.id >= 13) || ((person?.hrStep || 0) >= 13 && s.id >= 13),
-  )
+  const steps = (journey?.steps || []).filter((s) => s.id < 8 || s.id > 10)
   const nextStep = !hr && journey?.nextStep && journey.nextStep > 7 && journey.nextStep < 13 ? null : (journey?.nextStep ?? null)
   const selected = openStep ?? nextStep
   const selectedMeta = typeof selected === 'number' ? steps.find((s) => s.id === selected) : null
@@ -197,6 +195,7 @@ export function PersonDetailPage() {
   const nextLabel = useMemo(() => {
     if (!journey) return ''
     if (journey.facePending) return 'Enrol face'
+    if (journey.canStartProbation) return 'Active employment'
     if (waitingResignation) return hr ? 'Waiting for resignation request' : 'Request resignation'
     if (!nextStep) return hr ? (person?.hrStep === 12 ? 'No exit in progress' : 'Lifecycle complete') : 'Joining complete'
     return steps.find((s) => s.id === nextStep)?.label || ''
@@ -274,16 +273,40 @@ export function PersonDetailPage() {
         <p className="text-xs uppercase tracking-wide text-muted">Review</p>
         <p className="mt-1 font-display text-2xl">{nextLabel}</p>
         <p className="mt-1 text-sm text-muted">
-          {journey.waitingOn === 'employee'
-            ? 'Waiting for this person to finish their stage.'
-            : 'Review the current stage, then approve to move them to the next one.'}
+          {journey.canStartProbation
+            ? 'Joining is done. Salary and payslips run from Payroll using attendance. They are not stages on this person.'
+            : journey.waitingOn === 'employee'
+              ? 'Waiting for this person to finish their stage.'
+              : 'Review the current stage, then approve to move them to the next one.'}
         </p>
-        {!hr && person.hrStep >= 7 && !journey.facePending ? (
-          <Link to="/app/attendance" className="mt-3 inline-block text-sm text-accent">
-            Open attendance calendar
-          </Link>
+        {journey.canStartProbation ? (
+          <div className="mt-3 flex flex-wrap gap-2">
+            <Link to={`/app/payroll?person=${person.id}`} className="rounded-2xl bg-accent px-4 py-2 text-sm text-accent-fg">
+              Open payroll
+            </Link>
+            <button
+              type="button"
+              className="rounded-2xl border border-line px-4 py-2 text-sm"
+              onClick={() => {
+                void (async () => {
+                  setError('')
+                  try {
+                    const result = await api<{ journey: Journey }>(`/users/${person.id}/workflow`, {
+                      method: 'POST',
+                      body: { start: 'probation', note },
+                    })
+                    setJourney(result.journey)
+                    setOpenStep(12)
+                  } catch (err) {
+                    setError(err instanceof Error ? err.message : 'Could not start probation')
+                  }
+                })()
+              }}
+            >
+              Complete probation review
+            </button>
+          </div>
         ) : null}
-      </div>
 
       <div className="gap-6 lg:grid lg:grid-cols-[minmax(240px,300px)_minmax(0,1fr)] lg:items-start">
       <ol className="space-y-2 lg:sticky lg:top-0 lg:max-h-[calc(100svh-12rem)] lg:overflow-y-auto lg:overscroll-contain">
@@ -292,8 +315,10 @@ export function PersonDetailPage() {
           const current = nextStep === step.id
           const waiting = waitingResignation && step.id === 13
           const skipped = journey.events.some((e) => e.step === step.id && e.action === 'skip')
+          const heading = step.id === 1 ? 'Joining' : step.id === 11 ? 'Confirmation' : step.id === 13 ? 'Exit' : null
           return (
             <li key={step.id}>
+              {heading ? <p className="mb-2 mt-3 px-1 text-xs uppercase tracking-wide text-muted first:mt-0">{heading}</p> : null}
               <button
                 type="button"
                 onClick={() => setOpenStep(step.id)}
