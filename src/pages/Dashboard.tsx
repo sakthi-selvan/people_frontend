@@ -5,7 +5,7 @@ import { useAuth } from '../auth'
 import { AttendanceCalendar, CalendarLegend, CalendarToolbar, statusChip, type DayInfo } from '../components/AttendanceCalendar'
 import { JoiningStage } from '../components/JoiningStage'
 import { money } from '../payCycle'
-import { canResign, isHr, type HrStep, type User } from '../types'
+import { canResign, isHr, isInactive, type HrStep, type User } from '../types'
 
 type Punch = { date: string; checkIn?: string; checkOut?: string; sessions?: Array<{ checkIn?: string; checkOut?: string | null }> }
 type Holiday = { date: string; name: string }
@@ -65,8 +65,9 @@ function HrHome({ userName }: { userName: string }) {
     void api<PayInsights>('/payroll/insights').then(setPay).catch(() => setPay(null))
   }, [])
 
-  const onboarded = people.filter((p) => p.hrStep >= 7).length
-  const faced = people.filter((p) => p.hasFace).length
+  const active = people.filter((p) => !isInactive(p))
+  const inactive = people.filter((p) => isInactive(p))
+  const faced = active.filter((p) => p.hasFace).length
 
   return (
     <div className="space-y-8">
@@ -75,10 +76,14 @@ function HrHome({ userName }: { userName: string }) {
         <h1 className="font-display text-3xl md:text-4xl">{userName}</h1>
       </div>
       <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
-        <Stat label="People" value={String(people.length)} />
-        <Stat label="Onboarded" value={String(onboarded)} />
+        <Link to="/app/people" className="block">
+          <Stat label="Active" value={String(active.length)} />
+        </Link>
+        <Link to="/app/people?tab=inactive" className="block">
+          <Stat label="Inactive" value={String(inactive.length)} />
+        </Link>
         <Stat label="Faces enrolled" value={String(faced)} />
-        <Stat label="In process" value={String(people.filter((p) => p.hrStep < 7).length)} />
+        <Stat label="In process" value={String(active.filter((p) => p.hrStep < 7).length)} />
       </div>
       <Link to="/app/approvals" className="block rounded-3xl border border-accent bg-surface px-4 py-5">
         <p className="text-xs uppercase tracking-wide text-muted">Pending</p>

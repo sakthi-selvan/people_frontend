@@ -1,12 +1,13 @@
 import { useEffect, useState, type FormEvent } from 'react'
-import { Link, Navigate, useNavigate } from 'react-router-dom'
+import { Link, Navigate, useNavigate, useSearchParams } from 'react-router-dom'
 import { api } from '../api'
 import { useAuth } from '../auth'
-import { isHr, personStageLabel, type User } from '../types'
+import { isHr, isInactive, personStageLabel, type User } from '../types'
 
 export function PeoplePage() {
   const { role, user } = useAuth()
   const navigate = useNavigate()
+  const [params, setParams] = useSearchParams()
   const [people, setPeople] = useState<User[]>([])
   const [open, setOpen] = useState(false)
   const [error, setError] = useState('')
@@ -18,6 +19,7 @@ export function PeoplePage() {
     password: '',
     baseSalary: '45000',
   })
+  const tab = params.get('tab') === 'inactive' ? 'inactive' : 'active'
 
   async function load() {
     if (!isHr(role) && user) {
@@ -51,7 +53,17 @@ export function PeoplePage() {
     }
   }
 
+  function setTab(next: 'active' | 'inactive') {
+    const copy = new URLSearchParams(params)
+    if (next === 'inactive') copy.set('tab', 'inactive')
+    else copy.delete('tab')
+    setParams(copy, { replace: true })
+  }
+
   const canAdd = isHr(role)
+  const active = people.filter((person) => !isInactive(person))
+  const inactive = people.filter((person) => isInactive(person))
+  const shown = tab === 'inactive' ? inactive : active
 
   if (role === 'employee' && user) return <Navigate to={`/app/people/${user.id}`} replace />
 
@@ -65,6 +77,28 @@ export function PeoplePage() {
           </button>
         ) : null}
       </div>
+
+      <div className="grid grid-cols-2 rounded-2xl border border-line bg-surface p-1">
+        <button
+          type="button"
+          className={`rounded-xl px-3 py-2 text-sm ${tab === 'active' ? 'bg-accent text-accent-fg' : ''}`}
+          onClick={() => setTab('active')}
+        >
+          Active {active.length}
+        </button>
+        <button
+          type="button"
+          className={`rounded-xl px-3 py-2 text-sm ${tab === 'inactive' ? 'bg-accent text-accent-fg' : ''}`}
+          onClick={() => setTab('inactive')}
+        >
+          Inactive {inactive.length}
+        </button>
+      </div>
+      <p className="text-sm text-muted">
+        {tab === 'inactive'
+          ? 'Exited people stay here. Payroll and attendance downloads skip them. Open a record to read past attendance or payslips.'
+          : 'These people can be included in payroll, attendance download, and other processing.'}
+      </p>
 
       {open ? (
         <form onSubmit={(e) => void create(e)} className="grid gap-3 rounded-3xl border border-line bg-surface p-4 md:grid-cols-2">
@@ -84,32 +118,36 @@ export function PeoplePage() {
         </form>
       ) : null}
 
-      <ul className="divide-y divide-line overflow-hidden rounded-3xl border border-line bg-surface">
-        {people.map((person) => (
-          <li key={person.id} className="flex items-center gap-3 px-4 py-4">
-            <Link to={`/app/people/${person.id}`} className="min-w-0 flex-1">
-              <p className="font-medium">{person.name}</p>
-              <p className="text-sm text-muted">
-                {person.code} · {person.role} · {personStageLabel(person)}
-                {person.hasFace ? ' · face' : ''}
-              </p>
-            </Link>
-            {canAdd ? (
-              <div className="flex shrink-0 flex-col items-end gap-1 text-sm">
-                <Link to={`/app/attendance?person=${person.id}`} className="text-accent">
-                  View attendance
-                </Link>
-                <Link to={`/app/payroll?person=${person.id}`} className="text-accent">
-                  View payroll
-                </Link>
-              </div>
-            ) : null}
-            <span className="shrink-0 text-xs capitalize text-muted">
-              {person.status === 'exited' ? 'inactive' : person.status}
-            </span>
-          </li>
-        ))}
-      </ul>
+      {shown.length === 0 ? (
+        <p className="text-sm text-muted">
+          {tab === 'inactive' ? 'No inactive people yet. After exit is complete, they move here.' : 'No active people yet.'}
+        </p>
+      ) : (
+        <ul className="divide-y divide-line overflow-hidden rounded-3xl border border-line bg-surface">
+          {shown.map((person) => (
+            <li key={person.id} className="flex items-center gap-3 px-4 py-4">
+              <Link to={`/app/people/${person.id}`} className="min-w-0 flex-1">
+                <p className="font-medium">{person.name}</p>
+                <p className="text-sm text-muted">
+                  {person.code} · {person.role} · {personStageLabel(person)}
+                  {person.hasFace ? ' · face' : ''}
+                </p>
+              </Link>
+              {canAdd ? (
+                <div className="flex shrink-0 flex-col items-end gap-1 text-sm">
+                  <Link to={`/app/attendance?person=${person.id}`} className="text-accent">
+                    {isInactive(person) ? 'Past attendance' : 'View attendance'}
+                  </Link>
+                  <Link to={`/app/payroll?person=${person.id}`} className="text-accent">
+                    {isInactive(person) ? 'Past payroll' : 'View payroll'}
+                  </Link>
+                </div>
+              ) : null}
+              <span className="shrink-0 text-xs capitalize text-muted">{isInactive(person) ? 'inactive' : 'active'}</span>
+            </li>
+          ))}
+        </ul>
+      )}
     </div>
   )
 }

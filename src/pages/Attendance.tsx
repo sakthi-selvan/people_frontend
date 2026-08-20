@@ -11,7 +11,7 @@ import {
   statusChip,
   type DayInfo,
 } from '../components/AttendanceCalendar'
-import { isHr, type User } from '../types'
+import { isHr, isInactive, type User } from '../types'
 
 type ViewMode = 'calendar' | 'excel'
 type Session = { checkIn?: string; checkOut?: string | null }
@@ -311,8 +311,11 @@ export function AttendancePage() {
       return a.name.localeCompare(b.name)
     })
   }, [people, user?.id])
+  const activePeople = filterPeople.filter((person) => !isInactive(person))
+  const inactivePeople = filterPeople.filter((person) => isInactive(person))
   const personId = hr ? params.get('person') || user?.id || '' : user?.id || ''
   const viewingAll = hr && personId === 'all'
+  const viewingInactive = Boolean(hr && personId && personId !== 'all' && inactivePeople.some((person) => person.id === personId))
 
   function setPerson(id: string) {
     const next = new URLSearchParams(params)
@@ -328,7 +331,12 @@ export function AttendancePage() {
       api<Leave[]>('/leaves'),
       hr ? api<User[]>('/users') : Promise.resolve([]),
     ])
-    setRows(summary)
+    let next = summary
+    if (hr && personId && personId !== 'all' && !summary.some((row) => row.user.id === personId)) {
+      const extra = await api<Summary[]>(`/attendance/summary?year=${year}&month=${month}&userId=${personId}`)
+      next = [...summary, ...extra.filter((row) => !summary.some((item) => item.user.id === row.user.id))]
+    }
+    setRows(next)
     setPunches(punchRows)
     setHolidays(hols)
     setLeaves(leaveRows)
@@ -337,24 +345,26 @@ export function AttendancePage() {
 
   useEffect(() => {
     void load()
-  }, [year, month, from, to, hr])
+  }, [year, month, from, to, hr, personId])
 
   async function approve(userId: string) {
     await api('/attendance/approve', { method: 'POST', body: { userId, month: monthKey } })
     await load()
   }
 
-  const allPeople = (filterPeople.length ? filterPeople : rows.map((row) => row.user)).map((person) => ({
+  const allPeople = (activePeople.length ? activePeople : rows.map((row) => row.user)).map((person) => ({
     id: person.id,
     name: person.name,
   }))
   const selectedPeople = viewingAll
     ? allPeople
-    : allPeople.filter((person) => person.id === personId).length
-      ? allPeople.filter((person) => person.id === personId)
-      : user
-        ? [{ id: user.id, name: user.name }]
-        : []
+    : viewingInactive
+      ? inactivePeople.filter((person) => person.id === personId).map((person) => ({ id: person.id, name: person.name }))
+      : allPeople.filter((person) => person.id === personId).length
+        ? allPeople.filter((person) => person.id === personId)
+        : user
+          ? [{ id: user.id, name: user.name }]
+          : []
   const selectedId = viewingAll ? '' : selectedPeople[0]?.id || user?.id || ''
   const selectedPerson = rows.find((r) => r.user.id === selectedId)
   const calendarDays = buildDays(
@@ -404,7 +414,7 @@ export function AttendancePage() {
         <h1 className="font-display text-3xl">Attendance</h1>
         <p className="text-muted">
           {hr
-            ? 'Your attendance is shown first. Filter by a person or all people, then download the result or everyone.'
+            ? 'Your attendance is shown first. Download includes active people only. Open an inactive person to read their past record.'
             : 'A day is 9 hours. Work it in one stretch, or two halves with two check-ins and check-outs.'}
         </p>
       </div>
@@ -420,15 +430,21 @@ export function AttendancePage() {
         people={
           hr
             ? [
-                ...(user ? [{ id: user.id, name: user.name, you: true }] : []),
-                ...filterPeople
+                ...(user && !isInactive(user) ? [{ id: user.id, name: user.name, you: true, group: 'Active' }] : []),
+                ...activePeople
                   .filter((person) => person.id !== user?.id)
-                  .map((person) => ({ id: person.id, name: person.name })),
+                  .map((person) => ({ id: person.id, name: person.name, group: 'Active' })),
+                ...inactivePeople.map((person) => ({
+                  id: person.id,
+                  name: person.name,
+                  group: 'Inactive · past records',
+                })),
               ]
             : undefined
         }
         personId={personId}
         onPerson={hr ? setPerson : undefined}
+        allLabel="All active people"
       />
       <ViewSwitch view={view} onView={setView} />
       <div className="flex flex-wrap gap-2">
@@ -445,12 +461,17 @@ export function AttendancePage() {
           <button
             type="button"
             className="rounded-2xl border border-line px-4 py-2 text-sm"
-            onClick={(event) => download(event, allSheet, `attendance-all-${sheetDates[0] || monthKey}.xls`)}
+            onClick={(event) => download(event, allSheet, `attendance-active-${sheetDates[0] || monthKey}.xls`)}
           >
-            Download all attendance
+            Download all active attendance
           </button>
         ) : null}
       </div>
+      {viewingInactive ? (
+        <p className="text-sm text-muted">
+          This person is inactive. Past attendance is shown here and is not included in active downloads or monthly approval.
+        </p>
+      ) : null}
       {!viewingAll && (mine || stats) ? (
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
           <Stat label="Present" value={`${from || to ? stats.present : mine?.presentDays ?? stats.present}`} />
@@ -607,6 +628,8 @@ function AttendanceSheet({
                     <td className="px-4 py-3">
                       {row.approved ? (
                         <span className="text-good">Approved</span>
+                      ) : isInactive(row.user) ? (
+                        <span className="text-muted">Inactive</span>
                       ) : (
                         <button type="button" className="text-accent" onClick={() => onApprove(row.user.id)}>
                           Approve

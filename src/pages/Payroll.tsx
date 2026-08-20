@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { api } from '../api'
 import { useAuth } from '../auth'
-import { isHr, type User } from '../types'
+import { isHr, isInactive, type User } from '../types'
 import { EmailStatus } from '../components/EmailStatus'
 import { STATUS_LABEL, type DayInfo } from '../components/AttendanceCalendar'
 import { isoDate, money, periodLabel } from '../payCycle'
@@ -286,6 +286,10 @@ export function PayrollPage() {
 
   const label = periodLabel(from, to)
   const maxNet = Math.max(...(insights?.cycles || []).map((row) => Number(row.net || 0)), 1)
+  const activePeople = people.filter((person) => !isInactive(person))
+  const inactivePeople = people.filter((person) => isInactive(person))
+  const selectedPerson = people.find((person) => person.id === personId)
+  const viewingInactive = Boolean(hr && personId !== 'all' && selectedPerson && isInactive(selectedPerson))
 
   if (joining) {
     return (
@@ -311,7 +315,7 @@ export function PayrollPage() {
         <h1 className="font-display text-3xl">Payroll</h1>
         <p className="text-muted">
           {hr
-            ? 'Choose any start and end date. Process everyone in that range, or one person — including a final settlement if they are leaving.'
+            ? 'Payroll runs for active people only. Open an inactive person to read their past payslips.'
             : 'Each payslip is for the date range HR processed. See how many months you have worked and what you received.'}
         </p>
       </div>
@@ -352,31 +356,44 @@ export function PayrollPage() {
             {new Date(`${insights.lastPaidTo}T12:00:00`).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}.
           </p>
         ) : null}
-        {hr && insights?.caughtUp ? (
+        {hr && insights?.caughtUp && !viewingInactive ? (
           <p className="text-sm text-good">
-            {personId === 'all' ? 'Everyone is paid up to today.' : 'This person is paid up to date. Pick a later range only if they are leaving or days were missed.'}
+            {personId === 'all' ? 'Everyone active is paid up to today.' : 'This person is paid up to date. Pick a later range only if they are leaving or days were missed.'}
           </p>
         ) : null}
         {hr ? (
           <label className="block text-sm">
-            Process for
+            {viewingInactive ? 'Past records for' : 'Process for'}
             <select
               className="mt-1 w-full rounded-2xl border border-line bg-bg px-3 py-2"
               value={personId}
               onChange={(e) => setPerson(e.target.value)}
             >
               <option value="all">All active people</option>
-              {people.map((person) => (
-                <option key={person.id} value={person.id}>
-                  {person.name}
-                  {person.status === 'exited' ? ' (leaving)' : ''}
-                </option>
-              ))}
+              <optgroup label="Active">
+                {activePeople.map((person) => (
+                  <option key={person.id} value={person.id}>
+                    {person.name}
+                  </option>
+                ))}
+              </optgroup>
+              {inactivePeople.length ? (
+                <optgroup label="Inactive · past records">
+                  {inactivePeople.map((person) => (
+                    <option key={person.id} value={person.id}>
+                      {person.name}
+                    </option>
+                  ))}
+                </optgroup>
+              ) : null}
             </select>
           </label>
         ) : null}
-        {hr && personId !== 'all' ? (
-          <p className="text-sm text-muted">One person only — use this for a final settlement if they are leaving.</p>
+        {hr && viewingInactive ? (
+          <p className="text-sm text-muted">This person is inactive. Past payslips stay here. They are not included in payroll runs.</p>
+        ) : null}
+        {hr && personId !== 'all' && !viewingInactive ? (
+          <p className="text-sm text-muted">One active person only — use this for a final settlement before they exit.</p>
         ) : null}
       </div>
 
@@ -447,21 +464,22 @@ export function PayrollPage() {
         </section>
       ) : null}
 
-      {hr ? (
+      {hr && !viewingInactive ? (
         <button type="button" onClick={() => void run()} className="rounded-2xl bg-accent px-4 py-3 text-accent-fg">
-          {personId === 'all' ? 'Generate payslips for everyone' : `Generate payslip for ${people.find((p) => p.id === personId)?.name || 'this person'}`}
+          {personId === 'all' ? 'Generate payslips for everyone active' : `Generate payslip for ${selectedPerson?.name || 'this person'}`}
         </button>
       ) : null}
       {notice ? <p className="text-sm text-warn">{notice}</p> : null}
       {error ? <p className="text-sm text-danger">{error}</p> : null}
 
       <ul className="space-y-6">
-        {rows.map((row) => {
+        {(hr && personId === 'all' ? rows.filter((row) => !isInactive(row.user)) : rows).map((row) => {
           const days = hr ? splitFor(row, punches, holidays, leaves) : []
           const present = days.filter((day) => day.status === 'present' || day.status === 'open').length
           const leave = days.filter((day) => day.status === 'leave').length
           const hours = Math.round(days.reduce((sum, day) => sum + day.hours, 0) * 10) / 10
           const paySum = Math.round(days.reduce((sum, day) => sum + day.pay, 0))
+          const pastOnly = viewingInactive || isInactive(row.user)
           return (
             <li key={row.id} className="overflow-hidden rounded-3xl border-2 border-ink/20 bg-surface">
               <div className="flex flex-wrap items-start justify-between gap-3 bg-ink px-4 py-3 text-bg">
@@ -515,7 +533,7 @@ export function PayrollPage() {
                 </div>
               ) : null}
               <div className="space-y-3 p-4">
-                {hr ? (
+                {hr && !pastOnly ? (
                   <div className="grid gap-3 sm:grid-cols-[1fr_1fr_auto] sm:items-end">
                     <p className="text-sm text-muted">
                       Calculated
@@ -546,7 +564,9 @@ export function PayrollPage() {
             </li>
           )
         })}
-        {!rows.length ? <p className="text-sm text-muted">No payslips in this date range.</p> : null}
+        {!rows.length || (hr && personId === 'all' && !rows.some((row) => !isInactive(row.user))) ? (
+          <p className="text-sm text-muted">No payslips in this date range.</p>
+        ) : null}
       </ul>
     </div>
   )

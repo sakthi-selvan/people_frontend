@@ -86,6 +86,28 @@ function tone(status?: DayInfo['status']) {
   return 'bg-bg/50 text-muted'
 }
 
+function peopleGroups(people: Array<{ id: string; name: string; you?: boolean; group?: string }>) {
+  const order: string[] = []
+  const map = new Map<string, typeof people>()
+  for (const person of people) {
+    const group = person.group || ''
+    if (!map.has(group)) {
+      order.push(group)
+      map.set(group, [])
+    }
+    map.get(group)?.push(person)
+  }
+  return order.map((group) => ({ group, people: map.get(group) || [] }))
+}
+
+function personOption(person: { id: string; name: string; you?: boolean }) {
+  return (
+    <option key={person.id} value={person.id}>
+      {person.you ? `${person.name} (you)` : person.name}
+    </option>
+  )
+}
+
 export function CalendarToolbar({
   year,
   month,
@@ -98,6 +120,7 @@ export function CalendarToolbar({
   people,
   personId,
   onPerson,
+  allLabel = 'All people',
 }: {
   year: number
   month: number
@@ -107,9 +130,10 @@ export function CalendarToolbar({
   to: string
   onFrom: (value: string) => void
   onTo: (value: string) => void
-  people?: Array<{ id: string; name: string; you?: boolean }>
+  people?: Array<{ id: string; name: string; you?: boolean; group?: string }>
   personId?: string
   onPerson?: (id: string) => void
+  allLabel?: string
 }) {
   const years = Array.from(
     new Set([
@@ -192,12 +216,16 @@ export function CalendarToolbar({
             value={personId || ''}
             onChange={(e) => onPerson(e.target.value)}
           >
-            <option value="all">All people</option>
-            {people.map((person) => (
-              <option key={person.id} value={person.id}>
-                {person.you ? `${person.name} (you)` : person.name}
-              </option>
-            ))}
+            <option value="all">{allLabel}</option>
+            {peopleGroups(people).map((item) =>
+              item.group ? (
+                <optgroup key={item.group} label={item.group}>
+                  {item.people.map(personOption)}
+                </optgroup>
+              ) : (
+                item.people.map(personOption)
+              ),
+            )}
           </select>
         </label>
       ) : null}

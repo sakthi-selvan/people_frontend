@@ -257,10 +257,10 @@ export function PersonDetailPage() {
         {hr ? (
           <div className="flex flex-wrap gap-2">
             <Link to={`/app/attendance?person=${person.id}`} className="rounded-2xl bg-accent px-4 py-2 text-sm text-accent-fg">
-              View attendance
+              {isInactive(person) ? 'Past attendance' : 'View attendance'}
             </Link>
             <Link to={`/app/payroll?person=${person.id}`} className="rounded-2xl border border-line px-4 py-2 text-sm">
-              View payroll
+              {isInactive(person) ? 'Past payroll' : 'View payroll'}
             </Link>
           </div>
         ) : null}
@@ -271,7 +271,7 @@ export function PersonDetailPage() {
           <p className="text-xs uppercase tracking-wide text-muted">Account</p>
           <p className="mt-1 font-display text-2xl">Inactive</p>
           <p className="mt-1 text-sm text-muted">
-            This person has exited. Login is blocked, and they cannot request leave or take other employee actions. History stays on file.
+            This person has exited. Login is blocked, and they cannot request leave or take other employee actions. They are not included in payroll or attendance downloads. History stays on file.
           </p>
         </section>
       ) : null}
