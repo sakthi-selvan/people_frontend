@@ -307,6 +307,7 @@ export function PersonDetailPage() {
             </button>
           </div>
         ) : null}
+      </div>
 
       <div className="gap-6 lg:grid lg:grid-cols-[minmax(240px,300px)_minmax(0,1fr)] lg:items-start">
       <ol className="space-y-2 lg:sticky lg:top-0 lg:max-h-[calc(100svh-12rem)] lg:overflow-y-auto lg:overscroll-contain">
