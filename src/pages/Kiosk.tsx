@@ -168,7 +168,7 @@ export function KioskPage() {
             value={password}
             onChange={(e) => setPassword(e.target.value)}
           />
-          <FaceCapture onCapture={(d, photo) => void enroll(d, photo)} label="Enrol face" />
+          <FaceCapture onCapture={(d, photo) => void enroll(d, photo)} label="Enrol face" scanKey={email} />
         </div>
       ) : null}
 

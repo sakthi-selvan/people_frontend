@@ -307,8 +307,8 @@ export function PersonDetailPage() {
           ) : (
             <>
               <h2 className="font-display text-2xl">Enrol face</h2>
-              <p className="text-sm text-muted">Look at the camera to continue the attendance flow.</p>
-              <FaceCapture onCapture={(d, photo) => void saveFace(d, photo)} label="Verify and save face" />
+              <p className="text-sm text-muted">Look at the camera to continue the attendance flow. On HTTP, a scan animation is used instead.</p>
+              <FaceCapture onCapture={(d, photo) => void saveFace(d, photo)} label="Verify and save face" scanKey={person.email} />
             </>
           )
         ) : null}
