@@ -70,6 +70,14 @@ export function LoginPage() {
       <Link to="/device" className="mt-6 text-center text-sm text-accent">
         This is an attendance device
       </Link>
+      <a
+        href="/presentation/"
+        target="_blank"
+        rel="noreferrer"
+        className="mt-3 rounded-2xl border border-line bg-surface px-4 py-3 text-center text-sm font-medium text-ink transition-colors hover:border-accent hover:text-accent"
+      >
+        Explore the People overview <span aria-hidden="true">→</span>
+      </a>
     </div>
   )
 }
